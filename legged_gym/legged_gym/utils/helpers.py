@@ -180,13 +180,14 @@ def get_args():
         args.sim_device += f":{args.sim_device_id}"
     return args
 
-def export_policy_as_jit(actor_critic, path):
+def export_policy_as_jit(actor_critic, path, num_obs):
     if hasattr(actor_critic, 'memory_a'):
         # assumes LSTM: TODO add GRU
         exporter = PolicyExporterLSTM(actor_critic)
         exporter.export(path)
     elif hasattr(actor_critic, 'estimator'):
         exporter = PolicyExporterHIM(actor_critic)
+        exporter.num_obs = num_obs
         exporter.export(path)
     else: 
         os.makedirs(path, exist_ok=True)
@@ -229,12 +230,13 @@ class PolicyExporterHIM(torch.nn.Module):
         super().__init__()
         self.actor = copy.deepcopy(actor_critic.actor)
         self.estimator = copy.deepcopy(actor_critic.estimator.encoder)
+        self.num_obs = None
 
     def forward(self, obs_history):
         parts = self.estimator(obs_history)[:, 0:19]
         vel, z = parts[..., :3], parts[..., 3:]
         z = F.normalize(z, dim=-1, p=2.0)
-        return self.actor(torch.cat((obs_history[:, 0:28], vel, z), dim=1)) # quadruped -> 45 biped wheel -> 27 
+        return self.actor(torch.cat((obs_history[:, 0:self.num_obs], vel, z), dim=1)) # quadruped -> 45 biped wheel -> 27 
 
     def export(self, path):
         os.makedirs(path, exist_ok=True)

@@ -71,7 +71,7 @@ def play(args, x_vel=0.5, y_vel=0.0, yaw_vel=0.0, height=0.18):
     # export policy as a jit module (used to run it from C++)
     if EXPORT_POLICY:
         path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'policies')
-        export_policy_as_jit(ppo_runner.alg.actor_critic, path)
+        export_policy_as_jit(ppo_runner.alg.actor_critic, path, num_obs=25)
         print('Exported policy as jit script to: ', path)
 
     logger = Logger(env.dt)
@@ -133,4 +133,4 @@ if __name__ == '__main__':
     RECORD_FRAMES = False
     MOVE_CAMERA = False
     args = get_args()
-    play(args, x_vel=0.0, y_vel=0.0, yaw_vel=0.0, height=0.25)
+    play(args, x_vel=0.0, y_vel=0.0, yaw_vel=1.0, height=0.25)
