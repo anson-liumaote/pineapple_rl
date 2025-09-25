@@ -32,9 +32,12 @@ from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 
 from .bipedal.bipedal_him_config import BipedalHimRoughCfg, BipedalHimRoughCfgPPO
 from .bipedal.bipedal_him import BipedalHimRough
+from .pineapplev1.pineapple_him_config import PineappleHimRoughCfg, PineappleHimRoughCfgPPO
+from .pineapplev1.pineapple_him import PineappleHimRough
 
 import os
 
 from legged_gym.utils.task_registry import task_registry
 
 task_registry.register( "bipedal_him", BipedalHimRough, BipedalHimRoughCfg(), BipedalHimRoughCfgPPO() )
+task_registry.register( "pineapple_v1_him_plane", PineappleHimRough, PineappleHimRoughCfg(), PineappleHimRoughCfgPPO() )

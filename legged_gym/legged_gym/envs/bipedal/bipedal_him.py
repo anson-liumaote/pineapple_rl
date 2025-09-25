@@ -109,9 +109,18 @@ class BipedalHimRough(LeggedRobot):
                                         self.dof_vel * self.obs_scales.dof_vel,
                                         self.actions,
                                         ),dim=-1)
-        else:
+        elif self.cfg.env.use_lin_vel:
             current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,
                                         self.base_lin_vel  * self.obs_scales.lin_vel,
+                                        self.base_ang_vel  * self.obs_scales.ang_vel,
+                                        self.projected_gravity,
+                                        (self.dof_pos[:, :2] - self.default_dof_pos[:, :2]) * self.obs_scales.dof_pos,
+                                        (self.dof_pos[:, 3:5] - self.default_dof_pos[:, 3:5]) * self.obs_scales.dof_pos,
+                                        self.dof_vel * self.obs_scales.dof_vel,
+                                        self.actions,
+                                        ),dim=-1)
+        else:
+            current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,
                                         self.base_ang_vel  * self.obs_scales.ang_vel,
                                         self.projected_gravity,
                                         (self.dof_pos[:, :2] - self.default_dof_pos[:, :2]) * self.obs_scales.dof_pos,
@@ -124,7 +133,10 @@ class BipedalHimRough(LeggedRobot):
             current_obs += (2 * torch.rand_like(current_obs) - 1) * self.noise_scale_vec[0:self.num_one_step_obs]
 
         # add perceptive inputs if not blind
-        current_obs = torch.cat((current_obs, self.disturbance[:, 0, :]), dim=-1)
+        if self.cfg.env.use_lin_vel:
+            current_obs = torch.cat((current_obs, self.disturbance[:, 0, :]), dim=-1)
+        else:
+            current_obs = torch.cat((current_obs, self.base_lin_vel * self.obs_scales.lin_vel, self.disturbance[:, 0, :]), dim=-1)
         if self.cfg.terrain.measure_heights:
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements 
             heights += (2 * torch.rand_like(heights) - 1) * self.noise_scale_vec[self.num_one_step_obs:(self.num_one_step_obs+187)]
@@ -145,9 +157,18 @@ class BipedalHimRough(LeggedRobot):
                                         self.dof_vel * self.obs_scales.dof_vel,
                                         self.actions,
                                         ),dim=-1)
-        else:
+        elif self.cfg.env.use_lin_vel:
             current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,
                                         self.base_lin_vel  * self.obs_scales.lin_vel,
+                                        self.base_ang_vel  * self.obs_scales.ang_vel,
+                                        self.projected_gravity,
+                                        (self.dof_pos[:, :2] - self.default_dof_pos[:, :2]) * self.obs_scales.dof_pos,
+                                        (self.dof_pos[:, 3:5] - self.default_dof_pos[:, 3:5]) * self.obs_scales.dof_pos,
+                                        self.dof_vel * self.obs_scales.dof_vel,
+                                        self.actions,
+                                        ),dim=-1)
+        else:
+            current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,
                                         self.base_ang_vel  * self.obs_scales.ang_vel,
                                         self.projected_gravity,
                                         (self.dof_pos[:, :2] - self.default_dof_pos[:, :2]) * self.obs_scales.dof_pos,
@@ -160,7 +181,10 @@ class BipedalHimRough(LeggedRobot):
             current_obs += (2 * torch.rand_like(current_obs) - 1) * self.noise_scale_vec[0:self.num_one_step_obs]
 
         # add perceptive inputs if not blind
-        current_obs = torch.cat((current_obs, self.disturbance[:, 0, :]), dim=-1)
+        if self.cfg.env.use_lin_vel:
+            current_obs = torch.cat((current_obs, self.disturbance[:, 0, :]), dim=-1)
+        else:
+            current_obs = torch.cat((current_obs, self.base_lin_vel * self.obs_scales.lin_vel, self.disturbance[:, 0, :]), dim=-1)
         if self.cfg.terrain.measure_heights:
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements 
             heights += (2 * torch.rand_like(heights) - 1) * self.noise_scale_vec[self.num_one_step_obs:(self.num_one_step_obs+187)]
@@ -184,7 +208,7 @@ class BipedalHimRough(LeggedRobot):
             noise_vec[10:14] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
             noise_vec[14:20] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
             noise_vec[20:26] = 0. # previous actions
-        else:
+        elif self.cfg.env.use_lin_vel:
             noise_vec[0:3] = 0. # commands
             noise_vec[3:6] = noise_scales.lin_vel * noise_level * self.obs_scales.lin_vel
             noise_vec[6:9] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
@@ -192,6 +216,13 @@ class BipedalHimRough(LeggedRobot):
             noise_vec[12:16] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
             noise_vec[16:22] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
             noise_vec[22:28] = 0. # previous actions
+        else:
+            noise_vec[0:3] = 0. # commands
+            noise_vec[3:6] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
+            noise_vec[6:9] = noise_scales.gravity * noise_level
+            noise_vec[9:13] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
+            noise_vec[13:19] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
+            noise_vec[19:25] = 0. # previous actions
         if self.cfg.terrain.measure_heights:
             noise_vec[self.num_one_step_obs:(self.num_one_step_obs + 187)] = noise_scales.height_measurements* noise_level * self.obs_scales.height_measurements
             
@@ -422,4 +453,41 @@ class BipedalHimRough(LeggedRobot):
     def _reward_joint_deviation(self):
         # Penalize joint deviation from default position
         return torch.sum(torch.abs(self.dof_pos[:, 0:2] - self.default_dof_pos[:, 0:2]), dim=1)+torch.sum(torch.abs(self.dof_pos[:, 3:5] - self.default_dof_pos[:, 3:5]), dim=1)
-        
+    
+    def _reward_wheel_vel_if_zero_cmd(self):
+        """
+        Penalize wheel joint velocities when linear velocity command is ~0.
+        Returns a positive penalty term (apply a negative scale in config).
+        """
+
+        # use linear-velocity command magnitude (x,y) as "moving" indicator
+        # commands layout: [lin_x, lin_y, yaw(, height)]
+        cmd_lin_mag = torch.norm(self.commands[:, :3], dim=1)  # shape: [N]
+
+        # threshold for considering "zero command"
+        thr = 0.01
+
+        # smooth weight in [0,1]: 1 when |cmd|=0, 0 when |cmd|>=thr
+        weight = (1.0 - (cmd_lin_mag / thr).clamp(0.0, 1.0))
+
+        # penalty: sum of squared wheel velocities, masked by weight
+        return weight * torch.sum(torch.square(self.dof_vel[:, [2, 5]]), dim=1)
+
+    def _reward_base_vel_if_zero_cmd(self):
+        """
+        Penalize base linear velocities when linear velocity command is ~0.
+        Returns a positive penalty term (apply a negative scale in config).
+        """
+
+        # use linear-velocity command magnitude (x,y) as "moving" indicator
+        # commands layout: [lin_x, lin_y, yaw(, height)]
+        cmd_lin_mag = torch.norm(self.commands[:, :3], dim=1)  # shape: [N]
+
+        # threshold for considering "zero command"
+        thr = 0.01
+
+        # smooth weight in [0,1]: 1 when |cmd|=0, 0 when |cmd|>=thr
+        weight = (1.0 - (cmd_lin_mag / thr).clamp(0.0, 1.0))
+
+        # penalty: sum of squared wheel velocities, masked by weight
+        return weight * torch.sum(torch.square(self.base_lin_vel[:, :2]), dim=1)

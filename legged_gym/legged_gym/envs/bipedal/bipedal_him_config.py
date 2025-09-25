@@ -33,15 +33,16 @@ from legged_gym.envs.base.him_robot_config import LeggedRobotCfg, LeggedRobotCfg
 class BipedalHimRoughCfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
         num_envs = 4096
-        num_one_step_observations = 28  # command[:4], base_ang_vel, projected_gravity, pos(6-2), vel(6), actioins
+        num_one_step_observations = 25  # command[:4], base_ang_vel, projected_gravity, pos(6-2), vel(6), actioins
         num_observations = num_one_step_observations * 6
         # num_one_step_privileged_obs = num_one_step_observations + 3 + 3 + 187 # additional: base_lin_vel, external_forces, scan_dots
-        num_one_step_privileged_obs = num_one_step_observations + 3 + 187 # additional: external_forces, scan_dots
+        num_one_step_privileged_obs = num_one_step_observations + 3 + 3 + 187 # additional: external_forces, scan_dots
         num_privileged_obs = num_one_step_privileged_obs * 1 # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
         num_actions = 6
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
         episode_length_s = 20 # episode length in seconds
+        use_lin_vel = False
 
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.5]  # x,y,z [m]
@@ -73,19 +74,22 @@ class BipedalHimRoughCfg( LeggedRobotCfg ):
         # PD Drive parameters:
         position_control_indices = [0, 1, 3, 4] # indices of the joints that are controlled with position control
         velocity_control_indices = [2, 5]
-        leg_kp = 25
-        leg_kd = 0.3
-        stiffness = {"L_thigh_joint": 25.0, "L_calf_joint": 25.0,"L_wheel_joint":0.0, 
-                     "R_thigh_joint": 25.0, "R_calf_joint": 25.0,"R_wheel_joint":0.0}  # [N*m/rad]
-        damping = {"L_thigh_joint": 0.3, "L_calf_joint": 0.3, "L_wheel_joint": 0.3, 
-                   "R_thigh_joint": 0.3, "R_calf_joint": 0.3,"R_wheel_joint": 0.3}  # [N*m*s/rad]
-        decimation = 4
+        leg_kp = 20
+        leg_kd = 0.5
+        stiffness = {"L_thigh_joint": 20.0, "L_calf_joint": 20.0,"L_wheel_joint":0.0, 
+                     "R_thigh_joint": 20.0, "R_calf_joint": 20.0,"R_wheel_joint":0.0}  # [N*m/rad]
+        damping = {"L_thigh_joint": 0.5, "L_calf_joint": 0.5, "L_wheel_joint": 0.3, 
+                   "R_thigh_joint": 0.5, "R_calf_joint": 0.5,"R_wheel_joint": 0.3}  # [N*m*s/rad]
+        decimation = 10
         use_actuator_network = False
         hip_reduction = 1.0
 
+    class sim( LeggedRobotCfg.sim ):
+        dt =  0.002
+
     class commands( LeggedRobotCfg.commands ):
-        curriculum = False
-        max_curriculum = 3.0
+        curriculum = True
+        max_curriculum = 2.0
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = False # if true: compute ang vel command from heading error
@@ -98,8 +102,10 @@ class BipedalHimRoughCfg( LeggedRobotCfg ):
             # height = [0.1, 0.25]
 
     class terrain( LeggedRobotCfg.terrain ):
-        mesh_type = 'plane'
-        vertical_scale = 0.002 # m
+        mesh_type = 'trimesh'  # [plane, heightfield, trimesh]
+        # vertical_scale = 0.002 # m
+        # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete
+        terrain_proportions = [1.0, 0.0, 0.0, 0.0, 0.0]
 
     class asset( LeggedRobotCfg.asset ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/bipedal/urdf/quick_bipedal.urdf'
@@ -124,8 +130,8 @@ class BipedalHimRoughCfg( LeggedRobotCfg ):
             tracking_ang_vel = 1.0
 
             base_height = -20.0
-            nominal_state_thigh = -0.2
-            nominal_state_calf = -0.5
+            nominal_state_thigh = -0.1 # -0.2
+            nominal_state_calf = -0.1 # -0.5
             joint_deviation = -0.2
             lin_vel_z = -1.0
             ang_vel_xy = -0.05
@@ -140,6 +146,9 @@ class BipedalHimRoughCfg( LeggedRobotCfg ):
 
             collision = -10.0
             dof_pos_limits = -10.0
+            
+            wheel_vel_if_zero_cmd = 0.0   # penalty for wheel rotational velocity when commanded velocity is zero
+            base_vel_if_zero_cmd = 0.0
 
         only_positive_rewards = False  # if true negative total rewards are clipped at zero (avoids early termination problems)
         # clip_single_reward = 1
@@ -182,7 +191,7 @@ class BipedalHimRoughCfg( LeggedRobotCfg ):
         randomize_initial_joint_pos = True
         initial_joint_pos_range = [0.5, 1.5]
         
-        disturbance = True
+        disturbance = False
         disturbance_range = [-30.0, 30.0]
         disturbance_interval = 8
         
